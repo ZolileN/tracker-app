@@ -31,8 +31,11 @@ export interface Batch {
 export interface Settings {
   cats: Category[];
   rules: Rule[];
-  /** Category id -> budget per period, in rand */
+  /** Category id -> budget per period, in rand. The starting budget: used for any period before the first one in `periodBudgets`. */
   budgets: Record<string, number>;
+  /** Budgets made for a particular period (key = the period's start date). A budget applies from its period
+      onwards, until a later period has one of its own. */
+  periodBudgets?: Record<string, Record<string, number>>;
   /** Day of the month a budget period starts (payday), 1-28 */
   startDay: number;
   batches: Batch[];

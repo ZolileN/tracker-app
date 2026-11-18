@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { todayIso } from '../domain/format';
 import { useAccounts, useAllTx, useCat } from '../state/derived';
 import { useStore } from '../state/store';
-import { CategoryOptions } from './common';
+import { CategoryOptions, NEW_CAT, NewCategoryForm } from './common';
 
 /** Add or edit a transaction. */
 export function TxEditor() {
@@ -28,10 +28,11 @@ function EditorDialog({ id }: { id?: string }) {
     acct: t?.acct ?? 'Cash',
     note: t?.note ?? '',
   });
+  const [adding, setAdding] = useState(false);
   const amtRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!id) amtRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && close();
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [id, close]);
@@ -74,7 +75,10 @@ function EditorDialog({ id }: { id?: string }) {
         <div className="grid half" style={{ gap: 10 }}>
           <div className="f">
             <label htmlFor="m-cat">Category</label>
-            <select id="m-cat" value={catVal} onChange={e => setF({ ...f, cat: e.target.value })}><CategoryOptions only={ty} /></select>
+            <select id="m-cat" value={adding ? NEW_CAT : catVal}
+              onChange={e => (e.target.value === NEW_CAT ? setAdding(true) : (setAdding(false), setF({ ...f, cat: e.target.value })))}>
+              <CategoryOptions only={ty} allowNew />
+            </select>
           </div>
           <div className="f">
             <label htmlFor="m-acct">Account</label>
@@ -82,6 +86,11 @@ function EditorDialog({ id }: { id?: string }) {
             <datalist id="accts">{[...new Set(['Cash', ...accts])].map(a => <option key={a} value={a} />)}</datalist>
           </div>
         </div>
+        {adding && (
+          <div className="f">
+            <NewCategoryForm type={ty} autoFocus cancel={() => setAdding(false)} onDone={id => { setF({ ...f, cat: id }); setAdding(false); }} />
+          </div>
+        )}
         <div className="f">
           <label htmlFor="m-note">Note (optional)</label>
           <input id="m-note" type="text" maxLength={200} value={f.note} onChange={e => setF({ ...f, note: e.target.value })} />

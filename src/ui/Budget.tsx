@@ -1,20 +1,23 @@
 import { useMemo } from 'react';
+import { budgetFor, budgetSourceFor, budgetTotal, hasOwnBudget } from '../domain/budgets';
 import { R0, todayIso } from '../domain/format';
 import { periodEnd, periodLabel, summarise, txIn } from '../domain/periods';
-import { useAllTx, useCat, usePeriods } from '../state/derived';
+import { useAllTx, useBudgetPeriods, useCat } from '../state/derived';
 import { useStore } from '../state/store';
-import { PeriodSelect } from './common';
+import { BudgetPeriodSelect } from './common';
 
 export function Budget() {
   const all = useAllTx();
   const cat = useCat();
-  const { periods, period } = usePeriods();
+  const { periods, period, current, next } = useBudgetPeriods();
   const settings = useStore(s => s.settings);
   const setBudget = useStore(s => s.setBudget);
-  const fill = useStore(s => s.fillBudgetsFromAverage);
-  const B = settings.budgets;
-  const sm = summarise(txIn(all, period), cat);
+  const createBudget = useStore(s => s.createBudget);
+  const removePeriodBudget = useStore(s => s.removePeriodBudget);
+  const setPeriod = useStore(s => s.setPeriod);
+  const label = (p: string) => periodLabel(p, settings.startDay);
 
+  const sm = summarise(txIn(all, period), cat);
   const { done, avg, avgInc } = useMemo(() => {
     const done = periods.filter(p => periodEnd(p) < todayIso() && txIn(all, p).length);
     const avg: Record<string, number> = {};
@@ -28,18 +31,48 @@ export function Budget() {
   }, [periods, all, cat]);
 
   const exp = settings.cats.filter(c => c.type === 'exp');
-  const tb = exp.reduce((s, c) => s + (+B[c.id] || 0), 0);
+  const B = budgetFor(settings, period);
+  const tb = budgetTotal(B, exp.map(c => c.id));
+  const own = hasOwnBudget(settings, period);
+  const source = budgetSourceFor(settings, period);
+  const isFuture = period > current;
+  const nextHasOwn = hasOwnBudget(settings, next);
 
   return (
-    <>
+    <div className="stack">
       <div className="bar">
-        <PeriodSelect />
+        <BudgetPeriodSelect />
         <span className="grow" />
-        <button className="btn" onClick={fill} disabled={!done.length}>Fill from my average spending</button>
+        {period !== next && (
+          <button className="btn pri" onClick={() => setPeriod(next)}>
+            {nextHasOwn ? `Next month's budget` : `Plan next month (${label(next)})`}
+          </button>
+        )}
       </div>
-      <div className="grid kpis" style={{ marginBottom: 12 }}>
-        <div className="card kpi"><div className="lab">Total budget</div><div className="val num">{R0(tb)}</div><div className="note">per period</div></div>
-        <div className="card kpi"><div className="lab">Spent this period</div><div className="val num">{R0(sm.exp)}</div><div className="note">{tb ? Math.round((sm.exp / tb) * 100) + '% of budget' : ''}</div></div>
+
+      {!own && (
+        <div className="card plan">
+          <h2>{period === next ? `Plan your budget for ${label(next)}` : `${label(period)} has no budget of its own`}</h2>
+          <p className="sub">
+            {source ? `Right now it uses the budget made for ${label(source)}${tb ? ` (${R0(tb)})` : ''}. ` : tb ? `Right now it uses your starting budget (${R0(tb)}). ` : 'No budget is set yet. '}
+            A budget you make here applies from {label(period)} onwards; earlier months keep theirs.
+          </p>
+          <div className="bar" style={{ margin: 0 }}>
+            {tb > 0 && <button className="btn" onClick={() => createBudget(period, 'copy')}>Copy the current budget</button>}
+            <button className="btn" onClick={() => createBudget(period, 'average')} disabled={!done.length}
+              title={done.length ? '' : 'Needs at least one completed period of transactions'}>Start from my average spending</button>
+            <button className="btn" onClick={() => createBudget(period, 'empty')}>Start empty</button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid kpis">
+        <div className="card kpi"><div className="lab">Budget</div><div className="val num">{R0(tb)}</div><div className="note">for {label(period)}</div></div>
+        <div className="card kpi">
+          <div className="lab">{isFuture ? 'Spent' : 'Spent so far'}</div>
+          <div className="val num">{R0(sm.exp)}</div>
+          <div className="note">{isFuture ? 'this period has not started' : tb ? Math.round((sm.exp / tb) * 100) + '% of budget' : ''}</div>
+        </div>
         <div className="card kpi">
           <div className="lab">Average income</div>
           <div className="val num">{done.length ? R0(avgInc) : '—'}</div>
@@ -48,12 +81,19 @@ export function Budget() {
         <div className="card kpi">
           <div className="lab">Budget vs average income</div>
           <div className={`val num ${done.length && tb > avgInc ? 'neg' : ''}`}>{done.length && tb ? R0(avgInc - tb) : '—'}</div>
-          <div className="note">{done.length && tb ? (tb > avgInc ? 'budget is more than you earn' : 'unallocated') : ''}</div>
+          <div className="note">{done.length && tb ? (tb > avgInc ? 'budget is more than you earn' : 'not yet allocated') : ''}</div>
         </div>
       </div>
+
       <div className="card">
         <h2>Budget by category</h2>
-        <p className="sub">Set an amount per period ({periodLabel(period, settings.startDay)} shown). Leave blank for no limit.</p>
+        <p className="sub">
+          {own
+            ? <>{label(period)} has its own budget. It also applies to later months until one of them gets its own.{' '}
+                <button className="linkish" onClick={() => removePeriodBudget(period)}>Remove it</button></>
+            : 'Changing an amount gives this period a budget of its own, starting from the amounts shown.'}{' '}
+          Leave blank for no limit.
+        </p>
         <div className="scroll">
           <table>
             <thead><tr><th>Category</th><th className="r">Budget (R)</th><th className="r">Spent</th><th className="r">Average</th><th>Progress</th><th>Status</th></tr></thead>
@@ -66,8 +106,9 @@ export function Budget() {
                   <tr key={c.id}>
                     <td>{c.name}</td>
                     <td className="r">
-                      <input type="number" min={0} step={50} inputMode="numeric" defaultValue={b || ''} key={`${c.id}-${b}`} placeholder="0"
-                        onBlur={e => setBudget(c.id, +e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                      <input type="number" min={0} step={50} inputMode="numeric" defaultValue={b || ''} key={`${period}-${c.id}-${b}`} placeholder="0"
+                        onBlur={e => { if ((+e.target.value || 0) !== b) setBudget(period, c.id, +e.target.value); }}
+                        onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                         style={{ width: 100, textAlign: 'right' }} aria-label={`Budget for ${c.name}`} />
                     </td>
                     <td className="r num">{R0(sp)}</td>
@@ -83,6 +124,6 @@ export function Budget() {
           </table>
         </div>
       </div>
-    </>
+    </div>
   );
 }

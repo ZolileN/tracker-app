@@ -4,7 +4,7 @@ import { makeBackup, toCsv } from '../domain/settings';
 import type { CatType, Rule } from '../domain/types';
 import { useAllTx, useCat } from '../state/derived';
 import { useStore } from '../state/store';
-import { CategoryOptions, pickBackup } from './common';
+import { CategoryOptions, NewCategoryForm, pickBackup } from './common';
 
 /** Save a file (on iPhone this opens the share sheet, where "Save to Files" is). */
 function download(filename: string, data: string, type: string) {
@@ -24,7 +24,6 @@ export function Settings() {
   const s = useStore(st => st.settings);
   const months = useStore(st => st.months);
   const a = useStore();
-  const [newCat, setNewCat] = useState({ name: '', type: 'exp' as CatType });
   const [rule, setRule] = useState<Rule>({ k: '', s: '', cat: 'other' });
   const used: Record<string, number> = {};
   for (const t of all) used[t.cat] = (used[t.cat] || 0) + 1;
@@ -55,37 +54,11 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="card">
-        <h2>Categories</h2>
-        <p className="sub">Rename, add or remove. Deleting a category moves its transactions to Uncategorised.</p>
-        <div className="scroll">
-          <table>
-            <thead><tr><th>Name</th><th>Type</th><th className="r">Transactions</th><th /></tr></thead>
-            <tbody>
-              {s.cats.map(c => (
-                <tr key={c.id}>
-                  <td>
-                    <input type="text" defaultValue={c.name} key={c.name} style={{ width: '100%', minWidth: 160 }} aria-label="Category name"
-                      onBlur={e => a.renameCategory(c.id, e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-                  </td>
-                  <td>{c.type === 'inc' ? 'Income' : c.type === 'exp' ? 'Spending' : 'Not counted'}</td>
-                  <td className="r num">{used[c.id] || 0}</td>
-                  <td className="r">{!FIXED.has(c.id) && <button className="btn sm danger" onClick={() => a.deleteCategory(c.id)}>Delete</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <form className="bar" style={{ margin: '12px 0 0' }}
-          onSubmit={e => { e.preventDefault(); if (newCat.name.trim()) { a.addCategory(newCat.name, newCat.type); setNewCat({ ...newCat, name: '' }); } }}>
-          <input type="text" placeholder="New category name" value={newCat.name} onChange={e => setNewCat({ ...newCat, name: e.target.value })} />
-          <select value={newCat.type} onChange={e => setNewCat({ ...newCat, type: e.target.value as CatType })}>
-            <option value="exp">Spending</option>
-            <option value="inc">Income</option>
-          </select>
-          <button className="btn" type="submit">Add category</button>
-        </form>
+      <div className="grid half">
+        <CategoryGroup type="exp" title="Spending categories" sub="Where money goes. Each one can have a budget." used={used} />
+        <CategoryGroup type="inc" title="Income categories" sub="Where money comes from." used={used} />
       </div>
+      <CategoryGroup type="xfer" title="Not counted" sub="Money moved between your own accounts: left out of income and spending." used={used} />
 
       <div className="card">
         <h2>Your rules</h2>
@@ -122,6 +95,36 @@ export function Settings() {
           <button className="btn" type="submit">Add rule</button>
         </form>
       </div>
+    </div>
+  );
+}
+
+/** One group of categories (spending, income or not counted): rename, delete, and add a new one to the group. */
+function CategoryGroup({ type, title, sub, used }: { type: CatType; title: string; sub: string; used: Record<string, number> }) {
+  const cats = useStore(st => st.settings.cats);
+  const renameCategory = useStore(st => st.renameCategory);
+  const deleteCategory = useStore(st => st.deleteCategory);
+  const list = cats.filter(c => c.type === type);
+  return (
+    <div className="card">
+      <h2>{title}</h2>
+      <p className="sub">{sub} Rename by typing over a name. Deleting a category moves its transactions to {type === 'inc' ? 'Other income' : 'Uncategorised'}.</p>
+      {type !== 'xfer' && <NewCategoryForm type={type} />}
+      <table className="cats">
+        <thead><tr><th>Name</th><th className="r">Transactions</th><th /></tr></thead>
+        <tbody>
+          {list.map(c => (
+            <tr key={c.id}>
+              <td>
+                <input type="text" defaultValue={c.name} key={c.name} maxLength={40} aria-label={`Name of ${c.name}`}
+                  onBlur={e => renameCategory(c.id, e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+              </td>
+              <td className="r num">{used[c.id] || 0}</td>
+              <td className="r">{!FIXED.has(c.id) && <button className="btn sm danger" onClick={() => deleteCategory(c.id)} aria-label={`Delete ${c.name}`}>Delete</button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

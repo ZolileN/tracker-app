@@ -2,6 +2,7 @@ import { fmtDate, fmtDateY, R } from '../domain/format';
 import type { Pending } from '../domain/importing';
 import { useCat } from '../state/derived';
 import { useStore } from '../state/store';
+import { BankLogos, logoFor } from './BankLogos';
 import { pickStatements } from './common';
 
 export function Import() {
@@ -19,6 +20,7 @@ export function Import() {
         </p>
         <p><button className="btn pri" onClick={pickStatements}>Choose files</button></p>
         {busy && <p role="status">{busy}</p>}
+        <BankLogos />
       </div>
       {pending.map(p => <PendingCard key={p.key} p={p} />)}
       <div className="card">
@@ -58,7 +60,10 @@ function PendingCard({ p }: { p: Pending }) {
   const tout = p.tx.filter(t => t.amt < 0).reduce((s, t) => s - t.amt, 0);
   return (
     <div className="card">
-      <h2>{p.fileName}</h2>
+      <div className="pending-head">
+        {logoFor(r.bank) && <span className="tile"><img src={logoFor(r.bank)} alt={r.bank ?? ''} /></span>}
+        <h2>{p.fileName}</h2>
+      </div>
       {r.warnings.map(w => <p key={w} className="badc">{w}</p>)}
       {bad ? (
         <button className="btn" onClick={() => discard(p.key)}>Dismiss</button>

@@ -1,9 +1,8 @@
 import { useDeferredValue, useMemo } from 'react';
 import { fmtDate, R } from '../domain/format';
-import { txIn } from '../domain/periods';
-import { useAccounts, useAllTx, useCat, usePeriods } from '../state/derived';
+import { useAccounts, useAllTx, useCat, useRange } from '../state/derived';
 import { useStore } from '../state/store';
-import { CategoryOptions, PeriodSelect } from './common';
+import { CategoryOptions, NEW_CAT, RangePicker } from './common';
 
 const LIMIT = 400;
 
@@ -11,22 +10,31 @@ export function Transactions() {
   const all = useAllTx();
   const cat = useCat();
   const accts = useAccounts();
-  const { period } = usePeriods();
+  const range = useRange();
   const f = useStore(s => s.filter);
   const setFilter = useStore(s => s.setFilter);
   const setTxCategory = useStore(s => s.setTxCategory);
   const openEditor = useStore(s => s.openEditor);
+  const addCategory = useStore(s => s.addCategory);
+  /** Pick a category for a row; "+ New category…" asks for a name and files it under income or spending to match the row. */
+  const pickCategory = (id: string, amt: number, value: string) => {
+    if (value !== NEW_CAT) { setTxCategory(id, value); return; }
+    const type = amt > 0 ? 'inc' : 'exp';
+    const name = window.prompt(`Name of the new ${type === 'inc' ? 'income' : 'spending'} category`);
+    const newId = name ? addCategory(name, type) : null;
+    if (newId) setTxCategory(id, newId);
+  };
   const q = useDeferredValue(f.q.trim().toLowerCase());
 
   const list = useMemo(() => {
-    const base = f.period === 'all' ? all : txIn(all, period);
+    const base = f.period === 'all' ? all : all.filter(t => t.d >= range.from && t.d <= range.to);
     return base
       .filter(t =>
         (!f.cat || t.cat === f.cat) && (!f.acct || t.acct === f.acct) &&
         (!f.type || (f.type === 'in' ? t.amt > 0 : t.amt < 0)) &&
         (!q || (t.desc || '').toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q) || String(Math.abs(t.amt)).includes(q)))
       .sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0));
-  }, [all, period, f.period, f.cat, f.acct, f.type, q]);
+  }, [all, range.from, range.to, f.period, f.cat, f.acct, f.type, q]);
 
   const tin = list.filter(t => t.amt > 0).reduce((s, t) => s + t.amt, 0);
   const tout = list.filter(t => t.amt < 0).reduce((s, t) => s - t.amt, 0);
@@ -35,10 +43,10 @@ export function Transactions() {
     <>
       <div className="bar">
         <select value={f.period} onChange={e => setFilter({ period: e.target.value as 'sel' | 'all' })} aria-label="Which dates">
-          <option value="sel">Selected period</option>
+          <option value="sel">Selected dates</option>
           <option value="all">All dates</option>
         </select>
-        {f.period === 'sel' && <PeriodSelect />}
+        {f.period === 'sel' && <RangePicker />}
         <select value={f.cat} onChange={e => setFilter({ cat: e.target.value })} aria-label="Category">
           <option value="">All categories</option>
           <CategoryOptions />
@@ -75,8 +83,8 @@ export function Transactions() {
                   <td className="c-meta muted">{fmtDate(t.d)} · {t.acct}</td>
                   <td className="muted c-acct">{t.acct}</td>
                   <td className="c-cat">
-                    <select value={cat(t.cat).id} onChange={e => setTxCategory(t.id, e.target.value)} aria-label={`Category for ${t.desc}`}>
-                      <CategoryOptions />
+                    <select value={cat(t.cat).id} onChange={e => pickCategory(t.id, t.amt, e.target.value)} aria-label={`Category for ${t.desc}`}>
+                      <CategoryOptions allowNew />
                     </select>
                   </td>
                   <td className={`r num c-amt ${t.amt > 0 ? 'pos' : ''}`}>{t.amt > 0 ? '+' : ''}{R(t.amt).replace('−', '-')}</td>

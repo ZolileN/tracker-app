@@ -5,6 +5,10 @@ African bank (Absa, Capitec, FNB, Nedbank, Standard Bank, GoTyme (TymeBank), Dis
 African Bank, Bidvest, Old Mutual, Bank Zero and others) or a CSV, OFX/QFX or QIF download,
 check they reconcile, categorise spending, and budget per pay cycle.
 
+Features: any date range (pay periods or custom dates), a budget per month that you can plan
+ahead for next month, spending by category, insights, charts, rules that learn your categories,
+and bank logos showing which statements it can read.
+
 A TypeScript + React web app that installs on a phone (PWA) and works offline.
 Statements are read on your device; nothing is uploaded anywhere.
 
@@ -41,6 +45,13 @@ It then opens full-screen like an app and works offline, including reading PDFs.
 - Backups from the original single-file version (`legacy/index.html`) restore into this version
   unchanged, so that is how to bring old data across.
 
+## Budgets
+
+Each pay period can have its own budget (**Budget → Plan next month**, or pick any month and
+start from a copy of the current budget, your average spending, or empty). A budget applies from
+its month onwards until a later month gets its own, so planning next month never changes past
+months. For a custom date range, the Overview prorates the budget by day.
+
 ## Supported statements
 
 | Source | How it is read | Checked against |
@@ -70,7 +81,7 @@ src/
     generic.ts   any other bank's PDF
     text.ts      CSV, OFX, QIF
     readFile.ts  browser entry point; loads pdf.js on first use
-  domain/      pure logic: categories and rules, pay-cycle periods, importing, backups
+  domain/      pure logic: categories and rules, pay-cycle periods, budgets per month, importing, backups
   state/       Zustand store (all actions) and derived-data hooks; saves to localStorage
   ui/          screens: Overview, Transactions, Budget, Import, Settings, and the add/edit dialog
 tests/         Vitest: parser layouts, CSV/OFX/QIF, domain logic
@@ -78,12 +89,20 @@ tools/         check-statements.ts (real files), build_excel_pilot.py
 legacy/        the original single-file HTML version, kept for reference
 ```
 
+## Bank logos
+
+`src/assets/banks/` holds the logos shown on the Import and welcome screens (`src/ui/BankLogos.tsx`,
+which also marks which banks were checked against real statements). They were taken from the
+banks' Wikipedia articles. The logos are trademarks of their banks and are shown only to say which
+statements the app can read; check each bank's brand guidelines before publishing the app widely.
+
 ## Adding a bank
 
 Most banks need nothing: add the bank to `SA_BANKS` in `src/parser/banks.ts` (legal-name and
 domain markers, so a payment that mentions the bank does not change detection) and the generic
 parser reads its table. Run `npm run check-statements -- statement.pdf` on a few real statements
-and check that they reconcile. Add a fixture to `tests/fixtures.ts` for any new layout trait.
+and check that they reconcile. Add a fixture to `tests/fixtures.ts` for any new layout trait,
+and its logo to `src/assets/banks/` and `BANKS` in `src/ui/BankLogos.tsx`.
 
 Only if the generic parser cannot read a layout, write a parser in `src/parser/specific.ts`
 returning a `ParseResult` and register it in `SPECIFIC` in `src/parser/statement.ts`.

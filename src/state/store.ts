@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { readStatementFile } from '../parser/readFile';
+import { budgetFor } from '../domain/budgets';
 import { catLookup, merchantKey, recategorise, ruleHit } from '../domain/categorise';
 import { plural, todayIso } from '../domain/format';
 import { prepImport, withIds, type Pending } from '../domain/importing';
@@ -30,6 +31,8 @@ export interface ToastAction { label: string; run?: () => void }
 export interface Toast { id: number; msg: string; actions: ToastAction[] }
 export interface Filter { q: string; cat: string; acct: string; type: '' | 'in' | 'out'; period: 'sel' | 'all' }
 export type SaveState = 'saved' | 'saving' | 'error';
+export interface DateRange { from: string; to: string }
+export type BudgetStart = 'copy' | 'average' | 'empty';
 
 interface State {
   settings: Settings;
@@ -37,6 +40,8 @@ interface State {
   saveState: SaveState;
   /** Selected budget period (start date), or null for "the latest with data" */
   period: string | null;
+  /** A custom date range chosen instead of a pay period (Overview and Transactions) */
+  custom: DateRange | null;
   filter: Filter;
   pending: Pending[];
   busy: string;
@@ -47,6 +52,7 @@ interface State {
 
 interface Actions {
   setPeriod(p: string | null): void;
+  setCustom(r: DateRange | null): void;
   setFilter(f: Partial<Filter>): void;
   showCategory(cat: string): void;
   notify(msg: string, actions?: ToastAction[]): void;
@@ -64,10 +70,15 @@ interface Actions {
   setPendingAccount(key: string, name: string): void;
   removeBatch(id: string): void;
 
-  setBudget(cat: string, value: number): void;
-  fillBudgetsFromAverage(): void;
+  /** Set one category's budget for a period (the period gets a budget of its own if it had none) */
+  setBudget(period: string, cat: string, value: number): void;
+  /** Make a budget for a period: a copy of the budget that applies to it now, your average spending, or empty */
+  createBudget(period: string, start: BudgetStart): void;
+  /** Remove a period's own budget, so the earlier one applies again */
+  removePeriodBudget(period: string): void;
   setStartDay(day: number): void;
-  addCategory(name: string, type: Category['type']): void;
+  /** Add a category under income or spending (or not counted). Returns its id; an existing one with the same name and type is reused. */
+  addCategory(name: string, type: Category['type']): string | null;
   renameCategory(id: string, name: string): void;
   deleteCategory(id: string): void;
   addRule(rule: Rule): void;
@@ -127,13 +138,19 @@ export const useStore = create<Store>()((set, get) => {
     ...saved,
     saveState: 'saved',
     period: null,
+    custom: null,
     filter: { q: '', cat: '', acct: '', type: '', period: 'sel' },
     pending: [],
     busy: '',
     toast: null,
     editor: null,
 
-    setPeriod: period => set({ period }),
+    setPeriod: period => set({ period, custom: null }),
+    setCustom: r => {
+      if (!r) { set({ custom: null }); return; }
+      const [from, to] = r.from <= r.to ? [r.from, r.to] : [r.to, r.from];
+      set({ custom: { from, to } });
+    },
     setFilter: f => set({ filter: { ...get().filter, ...f } }),
     showCategory: cat => {
       set({ filter: { q: '', cat, acct: '', type: '', period: 'sel' } });
@@ -245,39 +262,60 @@ export const useStore = create<Store>()((set, get) => {
       ]);
     },
 
-    setBudget: (cat, value) => {
+    setBudget: (period, cat, value) => {
       const s = get().settings;
-      const budgets = { ...s.budgets };
+      const own = { ...(s.periodBudgets?.[period] ?? budgetFor(s, period)) };
       const v = Math.max(0, Math.round(value || 0));
-      if (v) budgets[cat] = v; else delete budgets[cat];
-      set({ settings: { ...s, budgets } });
+      if (v) own[cat] = v; else delete own[cat];
+      set({ settings: { ...s, periodBudgets: { ...s.periodBudgets, [period]: own } } });
     },
-    fillBudgetsFromAverage: () => {
+    createBudget: (period, start) => {
       const { settings: s, months } = get();
-      const all = allOf(months);
-      const cat = catLookup(s.cats);
-      const done = periodsOf(all, s.startDay).filter(p => periodEnd(p) < todayIso() && txIn(all, p).length);
-      if (!done.length) return;
-      const avg: Record<string, number> = {};
-      for (const p of done) {
-        const sm = summarise(txIn(all, p), cat);
-        for (const k in sm.byCat) avg[k] = (avg[k] || 0) + sm.byCat[k] / done.length;
+      let b: Record<string, number> = {};
+      if (start === 'copy') b = { ...budgetFor(s, period) };
+      if (start === 'average') {
+        const all = allOf(months);
+        const cat = catLookup(s.cats);
+        const done = periodsOf(all, s.startDay).filter(p => periodEnd(p) < todayIso() && txIn(all, p).length);
+        const avg: Record<string, number> = {};
+        for (const p of done) {
+          const sm = summarise(txIn(all, p), cat);
+          for (const k in sm.byCat) avg[k] = (avg[k] || 0) + sm.byCat[k] / done.length;
+        }
+        for (const c of s.cats) {
+          if (c.type !== 'exp') continue;
+          const v = Math.ceil((avg[c.id] || 0) / 50) * 50;
+          if (v > 0) b[c.id] = v;
+        }
       }
-      const budgets: Record<string, number> = { ...s.budgets };
-      for (const c of s.cats) {
-        if (c.type !== 'exp') continue;
-        const v = Math.ceil((avg[c.id] || 0) / 50) * 50;
-        if (v > 0) budgets[c.id] = v; else delete budgets[c.id];
-      }
-      set({ settings: { ...s, budgets } });
-      get().notify('Budgets set to your average spending, rounded up to the nearest R50. Adjust them down where you want to cut back.');
+      set({ settings: { ...s, periodBudgets: { ...s.periodBudgets, [period]: b } } });
+      get().notify(start === 'average'
+        ? 'Budget set to your average spending, rounded up to the nearest R50. Adjust it down where you want to cut back.'
+        : start === 'copy' ? 'Budget created. Change any amount below.' : 'Empty budget created. Fill in the amounts below.');
     },
-    setStartDay: day => set({ settings: { ...get().settings, startDay: Math.min(28, Math.max(1, Math.round(day || 1))) }, period: null }),
+    removePeriodBudget: period => {
+      const s = get().settings;
+      const pb = { ...s.periodBudgets };
+      delete pb[period];
+      set({ settings: { ...s, periodBudgets: pb } });
+    },
+    setStartDay: day => set({ settings: { ...get().settings, startDay: Math.min(28, Math.max(1, Math.round(day || 1))) }, period: null, custom: null }),
     addCategory: (name, type) => {
       const s = get().settings;
+      const n = name.trim().replace(/\s+/g, ' ').slice(0, 40);
+      if (!n) return null;
+      const group = type === 'inc' ? 'Income' : type === 'exp' ? 'Spending' : 'Not counted';
+      const same = s.cats.find(c => c.type === type && c.name.toLowerCase() === n.toLowerCase());
+      if (same) { get().notify(`"${same.name}" is already a category under ${group}.`); return same.id; }
+      const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      // file it at the end of its own group; "Uncategorised" stays the last spending category
       const cats = [...s.cats];
-      cats.splice(cats.length - 2, 0, { id: 'c' + Date.now().toString(36), name: name.trim().slice(0, 40), type });
+      let at = type === 'exp' ? cats.findIndex(c => c.id === 'other') : -1;
+      if (at < 0) { const lastSame = cats.map(c => c.type).lastIndexOf(type); at = lastSame < 0 ? cats.length : lastSame + 1; }
+      cats.splice(at, 0, { id, name: n, type });
       set({ settings: { ...s, cats } });
+      get().notify(`Added "${n}" under ${group}.`);
+      return id;
     },
     renameCategory: (id, name) => {
       const s = get().settings;
@@ -286,9 +324,9 @@ export const useStore = create<Store>()((set, get) => {
     },
     deleteCategory: id => {
       const s = get().settings;
-      const budgets = { ...s.budgets };
-      delete budgets[id];
-      const settings: Settings = { ...s, cats: s.cats.filter(c => c.id !== id), rules: s.rules.filter(r => r.cat !== id), budgets };
+      const drop = (b: Record<string, number>) => { const o = { ...b }; delete o[id]; return o; };
+      const periodBudgets = Object.fromEntries(Object.entries(s.periodBudgets ?? {}).map(([k, b]) => [k, drop(b)]));
+      const settings: Settings = { ...s, cats: s.cats.filter(c => c.id !== id), rules: s.rules.filter(r => r.cat !== id), budgets: drop(s.budgets), periodBudgets };
       set({ months: mapTx(get().months, t => t.cat === id, t => { const { man: _m, ...rest } = t; void _m; return rest; }) });
       applyRules(settings);
     },

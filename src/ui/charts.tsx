@@ -1,5 +1,5 @@
 import { fmtDate, fmtDateY, isoOf, MON, R0, todayIso } from '../domain/format';
-import { periodEnd, periodLabel, summarise, txIn } from '../domain/periods';
+import { periodLabel, summarise, txIn } from '../domain/periods';
 import type { Category, Tx } from '../domain/types';
 
 function niceMax(v: number): number {
@@ -24,10 +24,9 @@ function Grid({ max, y, L, right }: { max: number; y: (v: number) => number; L: 
 }
 
 /** Running total of spending through the period, against the budget. */
-export function CumulativeChart({ period, list, budget, cat }: { period: string; list: Tx[]; budget: number; cat: (id: string) => Category }) {
-  const end = periodEnd(period);
+export function CumulativeChart({ from, to, list, budget, cat }: { from: string; to: string; list: Tx[]; budget: number; cat: (id: string) => Category }) {
   const days: string[] = [];
-  for (let d = new Date(+period.slice(0, 4), +period.slice(5, 7) - 1, +period.slice(8)); isoOf(d) <= end; d.setDate(d.getDate() + 1)) days.push(isoOf(d));
+  for (let d = new Date(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8)); isoOf(d) <= to; d.setDate(d.getDate() + 1)) days.push(isoOf(d));
   const per: Record<string, number> = {};
   for (const t of list) if (cat(t.cat).type === 'exp') per[t.d] = (per[t.d] || 0) - t.amt;
   const today = todayIso();

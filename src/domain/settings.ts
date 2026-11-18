@@ -15,6 +15,7 @@ export function mergeSettings(saved: unknown): Settings {
   const have = new Set(out.cats.map(c => c.id));
   out.rules = (Array.isArray(s.rules) ? s.rules.filter(r => r && r.user) : []).concat(DEF_RULES.filter(r => have.has(r.cat)).map(r => ({ ...r })));
   if (!out.budgets || typeof out.budgets !== 'object') out.budgets = {};
+  if (!out.periodBudgets || typeof out.periodBudgets !== 'object') out.periodBudgets = {};
   if (!Array.isArray(out.batches)) out.batches = [];
   out.startDay = Math.min(28, Math.max(1, Math.round(+out.startDay || 25)));
   return out;

@@ -1,22 +1,65 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { isoOf, todayIso } from '../domain/format';
 import { periodLabel } from '../domain/periods';
 import type { CatType } from '../domain/types';
-import { usePeriods } from '../state/derived';
+import { useBudgetPeriods, usePeriods, useRange } from '../state/derived';
 import { useStore } from '../state/store';
 
-export function PeriodSelect() {
+const CUSTOM = '__custom';
+
+/** Pay periods, or "Custom dates…" with From / To fields and a few quick ranges. */
+export function RangePicker() {
   const { periods, period } = usePeriods();
+  const range = useRange();
+  const startDay = useStore(s => s.settings.startDay);
+  const custom = useStore(s => s.custom);
+  const setPeriod = useStore(s => s.setPeriod);
+  const setCustom = useStore(s => s.setCustom);
+  const quick = (days: number) => { const to = todayIso(); setCustom({ from: isoOf(new Date(Date.now() - (days - 1) * 864e5)), to }); };
+  return (
+    <>
+      <select value={custom ? CUSTOM : period} aria-label="Dates to show"
+        onChange={e => (e.target.value === CUSTOM ? setCustom({ from: range.from, to: range.to }) : setPeriod(e.target.value))}>
+        <optgroup label="Pay periods">
+          {periods.map(p => <option key={p} value={p}>{periodLabel(p, startDay)}</option>)}
+        </optgroup>
+        <option value={CUSTOM}>Custom dates…</option>
+      </select>
+      {custom && (
+        <span className="range">
+          <label>From <input type="date" value={custom.from} max={custom.to} onChange={e => e.target.value && setCustom({ ...custom, from: e.target.value })} /></label>
+          <label>to <input type="date" value={custom.to} min={custom.from} onChange={e => e.target.value && setCustom({ ...custom, to: e.target.value })} /></label>
+          <span className="quick">
+            <button type="button" className="btn sm" onClick={() => quick(7)}>7 days</button>
+            <button type="button" className="btn sm" onClick={() => quick(30)}>30 days</button>
+            <button type="button" className="btn sm" onClick={() => quick(90)}>90 days</button>
+            <button type="button" className="btn sm" onClick={() => setCustom({ from: todayIso().slice(0, 4) + '-01-01', to: todayIso() })}>This year</button>
+          </span>
+        </span>
+      )}
+    </>
+  );
+}
+
+/** Pay periods a budget can be set for, including next month. */
+export function BudgetPeriodSelect() {
+  const { periods, period, current, next } = useBudgetPeriods();
   const startDay = useStore(s => s.settings.startDay);
   const setPeriod = useStore(s => s.setPeriod);
   return (
     <select value={period} onChange={e => setPeriod(e.target.value)} aria-label="Budget period">
-      {periods.map(p => <option key={p} value={p}>{periodLabel(p, startDay)}</option>)}
+      {periods.map(p => (
+        <option key={p} value={p}>{periodLabel(p, startDay)}{p === next ? ' (next)' : p === current ? ' (now)' : ''}</option>
+      ))}
     </select>
   );
 }
 
-/** <option>s grouped by type; `only` limits to one type (plus "not counted"). */
-export function CategoryOptions({ only }: { only?: CatType }) {
+/** Value of the "+ New category…" option */
+export const NEW_CAT = '__new_category';
+
+/** <option>s grouped by type; `only` limits to one type (plus "not counted"); `allowNew` adds "+ New category…". */
+export function CategoryOptions({ only, allowNew }: { only?: CatType; allowNew?: boolean }) {
   const cats = useStore(s => s.settings.cats);
   const groups: [CatType, string][] = [['exp', 'Spending'], ['inc', 'Income'], ['xfer', 'Not counted']];
   return (
@@ -26,7 +69,29 @@ export function CategoryOptions({ only }: { only?: CatType }) {
           {cats.filter(c => c.type === ty).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </optgroup>
       ))}
+      {allowNew && <option value={NEW_CAT}>+ New category…</option>}
     </>
+  );
+}
+
+/** A small "name + Add" form that creates a category of one type. */
+export function NewCategoryForm({ type, onDone, autoFocus, cancel }: { type: 'inc' | 'exp'; onDone?: (id: string) => void; autoFocus?: boolean; cancel?: () => void }) {
+  const addCategory = useStore(s => s.addCategory);
+  const [name, setName] = useState('');
+  const word = type === 'inc' ? 'income' : 'spending';
+  const submit = () => {
+    const id = addCategory(name, type);
+    if (id) { setName(''); onDone?.(id); }
+  };
+  return (
+    // not a <form>: it can sit inside the transaction dialog's form
+    <div className="bar newcat" role="group" aria-label={`New ${word} category`}>
+      <input type="text" value={name} maxLength={40} autoFocus={autoFocus} placeholder={`New ${word} category, e.g. ${type === 'inc' ? 'Side hustle' : 'School fees'}`}
+        aria-label={`New ${word} category name`} onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } if (e.key === 'Escape' && cancel) { e.preventDefault(); cancel(); } }} />
+      <button type="button" className="btn" onClick={submit} disabled={!name.trim()}>Add</button>
+      {cancel && <button type="button" className="btn" onClick={cancel}>Cancel</button>}
+    </div>
   );
 }
 
