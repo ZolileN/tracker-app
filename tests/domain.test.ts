@@ -10,7 +10,7 @@ import type { ParseResult } from '../src/parser';
 describe('categorise', () => {
   const t = (desc: string, amt: number, extra = {}) => categorise({ desc, amt, ...extra }, DEF_RULES);
   it('uses built-in rules by direction', () => {
-    expect(t('POS PURCHASE SHOPRITE DE AAR', -120)).toBe('groceries');
+    expect(t('POS PURCHASE SHOPRITE TOWNSVILLE', -120)).toBe('groceries');
     expect(t('Interest Earned at 7.20%', 0.23)).toBe('interest');
     expect(t('ADMIN CHARGE', -362)).toBe('fees');
   });
@@ -18,7 +18,7 @@ describe('categorise', () => {
     expect(categorise({ desc: 'SPAR ROSEPARK', amt: -50 }, [{ k: 'spar rosepark', cat: 'eating', s: 'out', user: true }, ...DEF_RULES])).toBe('eating');
   });
   it('matches at the start of a word, never mid-word', () => {
-    expect(t('SHOPRITEHYPER DE AAR', -80)).toBe('groceries');
+    expect(t('SHOPRITEHYPER TOWNSVILLE', -80)).toBe('groceries');
     expect(t('ASPARAGUS FARM STALL', -80)).not.toBe('groceries'); // "spar" inside a word
   });
   it('always files bank fee rows under fees', () => expect(t('Something', -5, { fee: true })).toBe('fees'));
@@ -41,10 +41,18 @@ describe('pay-cycle periods', () => {
 
 describe('settings and backups', () => {
   it('keeps the person\'s rules and refreshes built-in ones', () => {
-    const s = mergeSettings({ startDay: 25, rules: [{ k: 'my landlord', cat: 'housing', s: 'out', user: true }, { k: 'old builtin', cat: 'other', s: '' }] });
+    const s = mergeSettings({ v: 2, startDay: 25, rules: [{ k: 'my landlord', cat: 'housing', s: 'out', user: true }, { k: 'old builtin', cat: 'other', s: '' }] });
     expect(s.rules.filter(r => r.user).map(r => r.k)).toEqual(['my landlord']);
     expect(s.rules.find(r => r.k === 'old builtin')).toBeUndefined();
     expect(s.rules.length).toBe(DEF_RULES.length + 1);
+  });
+  it('keeps rules that were built in before version 2 as the person\'s own', () => {
+    const s = mergeSettings({ v: 1, rules: [{ k: 'my old local shop', cat: 'groceries', s: 'out' }, { k: 'spar', cat: 'groceries', s: 'out' }] });
+    expect(s.rules.find(r => r.k === 'my old local shop')).toMatchObject({ user: true });
+    expect(s.rules.filter(r => r.k === 'spar' && r.user)).toHaveLength(0); // still built in: not duplicated
+    expect(s.v).toBe(2);
+    // once saved as version 2, a rule that is not the person's own is not carried over again
+    expect(mergeSettings({ v: 2, rules: [{ k: 'gone builtin', cat: 'other', s: '' }] }).rules.find(r => r.k === 'gone builtin')).toBeUndefined();
   });
   it('drops built-in rules for deleted categories', () => {
     const s = mergeSettings({ cats: [{ id: 'other', name: 'Uncategorised', type: 'exp' }] });
@@ -61,7 +69,7 @@ describe('settings and backups', () => {
 
 describe('importing', () => {
   const res: ParseResult = {
-    bank: 'Absa', account: 'Absa 8617', opening: 0, closing: 0, warnings: [], recon: null,
+    bank: 'Absa', account: 'Absa 1234', opening: 0, closing: 0, warnings: [], recon: null,
     tx: [
       { d: '2026-03-01', desc: 'Same', amt: -10, bal: 90 },
       { d: '2026-03-01', desc: 'Same', amt: -10, bal: 90 },

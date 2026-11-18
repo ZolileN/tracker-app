@@ -37,7 +37,7 @@ export interface Recon {
 export interface ParseResult {
   /** Bank name for display, or null when the file could not be read */
   bank: string | null;
-  /** Suggested account name, e.g. "Absa 8617" */
+  /** Suggested account name, e.g. "Absa 1234" */
   account: string;
   tx: ParsedTx[];
   opening: number | null;

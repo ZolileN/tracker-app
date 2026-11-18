@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from './state/store';
+import { Banners } from './ui/Banners';
 import { Budget } from './ui/Budget';
 import { FileInputs, Icons, Logo, ToastView, Tooltip } from './ui/common';
 import { Import } from './ui/Import';
@@ -68,7 +69,7 @@ export function App() {
     <>
       <header className="top">
         <div className="top-in">
-          <div className="brand"><Logo />Budget Tracker</div>
+          <div className="brand"><Logo />Budget Tracker <span className="beta">Beta</span></div>
           <div className={`sync ${saveState === 'error' ? 'err' : ''}`} role="status">{SAVE_TEXT[saveState]}</div>
           <nav className="tabs" aria-label="Screens">
             {(Object.keys(VIEWS) as View[]).map(k => (
@@ -80,7 +81,10 @@ export function App() {
           </nav>
         </div>
       </header>
-      <main>{VIEWS[view].render()}</main>
+      <main>
+        <Banners />
+        {VIEWS[view].render()}
+      </main>
       <TxEditor />
       <ToastView />
       <Tooltip />

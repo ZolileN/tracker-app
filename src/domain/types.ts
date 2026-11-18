@@ -39,7 +39,10 @@ export interface Settings {
   /** Day of the month a budget period starts (payday), 1-28 */
   startDay: number;
   batches: Batch[];
-  v: 1;
+  /** When a backup was last downloaded on this device (ISO date) */
+  lastBackup?: string;
+  /** Settings format: 2 = built-in rules no longer saved with the settings */
+  v: 1 | 2;
 }
 
 export interface Tx {

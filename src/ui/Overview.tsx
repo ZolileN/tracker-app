@@ -7,8 +7,8 @@ import type { Category, Tx } from '../domain/types';
 import { useAllTx, useCat, usePeriods, useRange, type Range } from '../state/derived';
 import { useStore } from '../state/store';
 import { CumulativeChart, TrendChart } from './charts';
-import { BankLogos } from './BankLogos';
 import { pickStatements, RangePicker } from './common';
+import { Welcome } from './Welcome';
 
 export function Overview() {
   const all = useAllTx();
@@ -20,22 +20,7 @@ export function Overview() {
   const setPeriod = useStore(s => s.setPeriod);
   const showCategory = useStore(s => s.showCategory);
 
-  if (!all.length) {
-    return (
-      <div className="card empty">
-        <h2>Start by adding your money</h2>
-        <p className="muted">
-          Upload a bank statement (a PDF from Absa, Capitec, FNB, Nedbank, Standard Bank, GoTyme (TymeBank), Discovery, Investec or another
-          South African bank, or a CSV, OFX or QIF download) or capture a transaction by hand.
-        </p>
-        <p className="bar" style={{ justifyContent: 'center' }}>
-          <button className="btn pri" onClick={pickStatements}>Upload statements</button>
-          <button className="btn" onClick={() => openEditor()}>Add a transaction</button>
-        </p>
-        <BankLogos />
-      </div>
-    );
-  }
+  if (!all.length) return <Welcome />;
 
   const list = inRange(all, range.from, range.to);
   const sm = summarise(list, cat);

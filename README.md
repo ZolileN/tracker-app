@@ -29,13 +29,39 @@ npm run dev          # http://localhost:5173, also reachable from your phone on 
 | `npm test` | Unit and layout tests (Vitest) |
 | `npm run typecheck` | TypeScript only |
 | `npm run check-statements -- file.pdf [more files] [--tx]` | Run real statements through the parser and check they reconcile |
+| `npm run check-layout -- statement-layout.json [--lines]` | Look at a masked layout a tester shared from the app, and try the parser on it |
 
-### On your iPhone
+### Deploy to Vercel
 
-`dist/` is a plain static site: host it anywhere that serves files over HTTPS (Netlify,
-Cloudflare Pages, GitHub Pages, Vercel...). Open it in Safari, tap Share → **Add to Home Screen**.
-It then opens full-screen like an app and works offline, including reading PDFs.
-(Installing needs HTTPS; the dev server's plain-HTTP address works in the browser but will not install.)
+`vercel.json` holds the build settings and security headers (a strict Content Security Policy:
+the app loads nothing from other sites). `npm run preview` serves the same headers locally.
+
+Either import the GitHub repo in the Vercel dashboard (it picks up `vercel.json`), or from here:
+
+```sh
+npx vercel login
+npx vercel --prod
+```
+
+Optional: set `VITE_FEEDBACK_URL` (e.g. a Google Form) under Project → Settings → Environment
+Variables, then redeploy. It adds a "Send feedback" link to the welcome screen and Settings → About.
+
+### On a phone
+
+Open the site and install it: on iPhone, Safari → Share → **Add to Home Screen**; on Android, the
+app offers an **Install** button. Installing matters on iPhone: Safari can clear a website's data
+after about a week without a visit, but not an installed app's. The app shows this tip itself.
+
+## Testing with friends
+
+- The app is marked **Beta** and shows its version in Settings → About; ask testers to quote it.
+- Password-protected statements open in the app (the password is used once and never saved).
+- If a statement is not read correctly, the tester taps **"Not read correctly? Share this statement's
+  layout"** on the Import screen and sends you the file. It has the position of every piece of text
+  with names, account numbers, amounts and descriptions masked (only dates, column headings, month
+  names and bank names are kept). Run `npm run check-layout -- that-file.json` to see what the parser
+  makes of it, then add a fixture with made-up values to `tests/fixtures.ts`.
+- The app reminds people to download a backup every 30 days once they have data.
 
 ## Your data
 

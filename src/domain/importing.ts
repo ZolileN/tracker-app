@@ -1,4 +1,4 @@
-import type { ParseResult } from '../parser/types';
+import type { Line, ParseResult } from '../parser/types';
 import { categorise } from './categorise';
 import { hash } from './format';
 import type { Rule, Tx } from './types';
@@ -15,6 +15,13 @@ export interface Pending {
   fresh: number;
   from?: string;
   to?: string;
+  /** The file itself (kept in memory only), so a locked PDF can be opened again with a password */
+  file?: File;
+  /** Password-protected PDF: waiting for a password, or the last one was wrong */
+  locked?: 'need' | 'wrong';
+  /** What was read (memory only), for sharing a statement's masked layout */
+  lines?: Line[];
+  text?: string;
 }
 
 /** Ids come from account + date + amount + balance + description (+ a counter for identical rows),

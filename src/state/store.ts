@@ -65,6 +65,8 @@ interface Actions {
   setTxCategory(id: string, cat: string): void;
 
   importFiles(files: File[]): Promise<void>;
+  /** Open a password-protected PDF that is waiting on the Import screen */
+  unlockPending(key: string, password: string): Promise<void>;
   confirmImport(key: string): void;
   discardPending(key: string): void;
   setPendingAccount(key: string, name: string): void;
@@ -84,6 +86,8 @@ interface Actions {
   addRule(rule: Rule): void;
   deleteRule(index: number): void;
   restoreBackup(text: string): void;
+  /** Remember that a backup was just downloaded */
+  markBackedUp(): void;
   wipe(): void;
 }
 
@@ -126,6 +130,14 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let toastSeq = 0;
 
 const saved = loadSaved();
+
+/** Read a file into a Pending import (categorised, with what is new marked). */
+async function readPending(f: File, password?: string): Promise<Pending> {
+  const r = await readStatementFile(f, password);
+  const { settings, months } = useStore.getState();
+  const p = prepImport(r.res.bank ? r.res : { ...r.res, tx: [] }, f.name, new Set(allOf(months).map(t => t.id)), settings.rules);
+  return { ...p, file: f, locked: r.locked, lines: r.lines, text: r.text };
+}
 
 export const useStore = create<Store>()((set, get) => {
   /** Re-apply rules after settings changed. */
@@ -219,12 +231,16 @@ export const useStore = create<Store>()((set, get) => {
     importFiles: async files => {
       for (const f of files) {
         set({ busy: `Reading ${f.name}…` });
-        const res = await readStatementFile(f);
-        const { settings, months } = get();
-        const p = prepImport(res.bank ? res : { ...res, tx: [] }, f.name, new Set(allOf(months).map(t => t.id)), settings.rules);
-        set({ pending: [...get().pending, p] });
+        set({ pending: [...get().pending, await readPending(f)] });
       }
       set({ busy: '' });
+    },
+    unlockPending: async (key, password) => {
+      const old = get().pending.find(x => x.key === key);
+      if (!old?.file) return;
+      set({ busy: `Opening ${old.fileName}…` });
+      const p = await readPending(old.file, password);
+      set({ busy: '', pending: get().pending.map(x => (x.key === key ? { ...p, key } : x)) });
     },
     confirmImport: key => {
       const p = get().pending.find(x => x.key === key);
@@ -339,6 +355,7 @@ export const useStore = create<Store>()((set, get) => {
       const s = get().settings;
       applyRules({ ...s, rules: s.rules.filter((_, i) => i !== index) });
     },
+    markBackedUp: () => set({ settings: { ...get().settings, lastBackup: todayIso() } }),
     restoreBackup: text => {
       const b = readBackup(text);
       if (!b) { get().notify('That file is not a backup from this app.'); return; }

@@ -2,18 +2,23 @@ import { DEF_CATS, DEF_RULES } from './defaults';
 import type { Months, Settings, Tx } from './types';
 
 export function defaultSettings(startDay = 25): Settings {
-  return { cats: DEF_CATS.map(c => ({ ...c })), rules: DEF_RULES.map(r => ({ ...r })), budgets: {}, startDay, batches: [], v: 1 };
+  return { cats: DEF_CATS.map(c => ({ ...c })), rules: DEF_RULES.map(r => ({ ...r })), budgets: {}, startDay, batches: [], v: 2 };
 }
 
 /** Saved settings on top of the defaults. The person's own rules are kept; built-in rules always come
-    from this version of the app (minus categories that were deleted), so new built-in rules reach everyone. */
+    from this version of the app (minus categories that were deleted), so new built-in rules reach everyone.
+    Settings saved before version 2 kept every rule; any of those that is no longer built in becomes one of
+    the person's own rules, so nothing they relied on disappears. */
 export function mergeSettings(saved: unknown): Settings {
   const s = (saved && typeof saved === 'object' ? JSON.parse(JSON.stringify(saved)) : {}) as Partial<Settings>;
-  const out: Settings = { ...defaultSettings(), ...s, v: 1 };
+  const out: Settings = { ...defaultSettings(), ...s, v: 2 };
   if (!Array.isArray(out.cats) || !out.cats.length) out.cats = DEF_CATS.map(c => ({ ...c }));
   for (const k of ['other', 'xfer', 'fees']) if (!out.cats.find(c => c.id === k)) out.cats.push({ ...DEF_CATS.find(c => c.id === k)! });
   const have = new Set(out.cats.map(c => c.id));
-  out.rules = (Array.isArray(s.rules) ? s.rules.filter(r => r && r.user) : []).concat(DEF_RULES.filter(r => have.has(r.cat)).map(r => ({ ...r })));
+  const savedRules = Array.isArray(s.rules) ? s.rules.filter(r => r && typeof r.k === 'string' && typeof r.cat === 'string') : [];
+  const builtIn = new Set(DEF_RULES.map(r => `${r.k}|${r.cat}|${r.s}`));
+  const kept = (s.v ?? 1) < 2 ? savedRules.filter(r => r.user || !builtIn.has(`${r.k}|${r.cat}|${r.s}`)).map(r => ({ ...r, user: true })) : savedRules.filter(r => r.user);
+  out.rules = kept.filter(r => have.has(r.cat)).concat(DEF_RULES.filter(r => have.has(r.cat)).map(r => ({ ...r })));
   if (!out.budgets || typeof out.budgets !== 'object') out.budgets = {};
   if (!out.periodBudgets || typeof out.periodBudgets !== 'object') out.periodBudgets = {};
   if (!Array.isArray(out.batches)) out.batches = [];

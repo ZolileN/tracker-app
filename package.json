@@ -1,7 +1,7 @@
 {
   "name": "budget-tracker",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Personal budget tracker for South African bank statements. Statements are read on your device.",
   "type": "module",
   "engines": {
@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check-statements": "tsx tools/check-statements.ts"
+    "check-statements": "tsx tools/check-statements.ts",
+    "check-layout": "tsx tools/check-layout.ts"
   },
   "dependencies": {
     "pdfjs-dist": "6.5.438",

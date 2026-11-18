@@ -1,20 +1,12 @@
 import { useState } from 'react';
-import { todayIso } from '../domain/format';
-import { makeBackup, toCsv } from '../domain/settings';
+import { fmtDateY, todayIso } from '../domain/format';
+import { toCsv } from '../domain/settings';
 import type { CatType, Rule } from '../domain/types';
 import { useAllTx, useCat } from '../state/derived';
 import { useStore } from '../state/store';
+import { useDownloadBackup } from './Banners';
 import { CategoryOptions, NewCategoryForm, pickBackup } from './common';
-
-/** Save a file (on iPhone this opens the share sheet, where "Save to Files" is). */
-function download(filename: string, data: string, type: string) {
-  const url = URL.createObjectURL(new Blob([data], { type }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
+import { APP_VERSION, download, FEEDBACK_URL } from './files';
 
 const FIXED = new Set(['other', 'xfer', 'fees', 'other_inc']);
 
@@ -22,7 +14,7 @@ export function Settings() {
   const all = useAllTx();
   const cat = useCat();
   const s = useStore(st => st.settings);
-  const months = useStore(st => st.months);
+  const backup = useDownloadBackup();
   const a = useStore();
   const [rule, setRule] = useState<Rule>({ k: '', s: '', cat: 'other' });
   const used: Record<string, number> = {};
@@ -31,6 +23,7 @@ export function Settings() {
 
   return (
     <div className="stack">
+      <About />
       <div className="grid half">
         <div className="card">
           <h2>Budget period</h2>
@@ -44,9 +37,12 @@ export function Settings() {
         </div>
         <div className="card">
           <h2>Backup</h2>
-          <p className="sub">Your data lives on this device only. Download a backup now and then, or restore one (backups from the old version work too).</p>
+          <p className="sub">
+            Your data lives on this device only. Download a backup now and then, or restore one (backups from the old version work too).
+            {s.lastBackup ? ` Last backup: ${fmtDateY(s.lastBackup)}.` : ' No backup yet.'}
+          </p>
           <div className="bar" style={{ margin: 0 }}>
-            <button className="btn" onClick={() => download(`budget-backup-${todayIso()}.json`, makeBackup(s, months), 'application/json')}>Download backup (.json)</button>
+            <button className="btn" onClick={backup}>Download backup (.json)</button>
             <button className="btn" onClick={() => download(`transactions-${todayIso()}.csv`, toCsv(all, id => cat(id).name), 'text/csv')}>Download transactions (.csv)</button>
             <button className="btn" onClick={pickBackup}>Restore from backup</button>
             <button className="btn danger" onClick={a.wipe}>Delete all data</button>
@@ -125,6 +121,23 @@ function CategoryGroup({ type, title, sub, used }: { type: CatType; title: strin
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** What the app is, how it treats your data, and where to send feedback. */
+function About() {
+  return (
+    <div className="card about">
+      <h2>About <span className="beta">Beta</span></h2>
+      <p className="sub">Budget Tracker v{APP_VERSION}, a test version shared with friends.</p>
+      <ul className="small">
+        <li><b>Your data stays on this device.</b> Statements are read here and only the transactions are saved, in this browser's storage. Nothing is sent to a server, and there is no tracking.</li>
+        <li><b>Not financial advice.</b> The figures come from your statements; always check against your bank.</li>
+        <li><b>A statement not read correctly?</b> On the Import screen, use "Share this statement's layout": it sends only masked positions, never names, numbers or amounts.</li>
+        <li>Bank logos are trademarks of their banks, shown only to say which statements the app can read.</li>
+      </ul>
+      {FEEDBACK_URL && <a className="btn" href={FEEDBACK_URL} target="_blank" rel="noreferrer">Send feedback</a>}
     </div>
   );
 }

@@ -32,23 +32,21 @@ export const DEF_CATS: Category[] = [
 /** Built-in rules: the keyword matches at the start of a word; s = direction ('in', 'out' or '' for either). First match wins. */
 const R = (k: string, cat: string, s: Rule['s']): Rule => ({ k, cat, s });
 export const DEF_RULES: Rule[] = [
-  R('zolile capitec', 'xfer', ''), R('zolile absa', 'xfer', ''), R('digital transf', 'xfer', ''), R('admin charge', 'fees', 'out'),
+  R('digital transf', 'xfer', ''), R('admin charge', 'fees', 'out'),
   R('transaction charge', 'fees', 'out'), R('monthly acc fee', 'fees', 'out'), R('monthly management fee', 'fees', 'out'), R('stamped statement', 'fees', 'out'),
   R('fnb app payment', 'people', 'out'), R('send money', 'people', 'out'), R('monthly account fee', 'fees', 'out'), R('service fee', 'fees', 'out'),
-  R('zolile nedbank', 'xfer', ''), R('interest sweep', 'xfer', ''), R('interest', 'fees', 'out'), R('interest', 'interest', 'in'),
-  R('theaurum', 'salary', 'in'), R('salary', 'salary', 'in'), R('sassa', 'grants', 'in'), R('sars', 'refunds', 'in'),
+  R('interest sweep', 'xfer', ''), R('interest', 'fees', 'out'), R('interest', 'interest', 'in'),
+  R('salary', 'salary', 'in'), R('sassa', 'grants', 'in'), R('sars', 'refunds', 'in'),
   R('interest received', 'interest', 'in'), R('rent', 'rental', 'in'), R('rent', 'housing', 'out'), R('nedins', 'insurance', ''),
   R('nedlife', 'insurance', ''), R('30dlife', 'insurance', ''), R('insurance', 'insurance', ''), R('sanlam', 'insurance', ''),
   R('old mutual', 'insurance', ''), R('discovery', 'insurance', ''), R('nimble', 'debt', ''), R('capfin', 'debt', ''),
   R('unifi', 'debt', ''), R('wonga', 'debt', ''), R('finchoice', 'debt', ''), R('loan', 'debt', 'out'),
-  R('tops', 'alcohol', 'out'), R('liquor', 'alcohol', 'out'), R('beershack', 'alcohol', 'out'), R('venotec', 'alcohol', 'out'),
-  R('spar', 'groceries', 'out'), R('superspar', 'groceries', 'out'), R('checkers', 'groceries', 'out'), R('pnp', 'groceries', 'out'),
+  R('tops', 'alcohol', 'out'), R('liquor', 'alcohol', 'out'),   R('spar', 'groceries', 'out'), R('superspar', 'groceries', 'out'), R('checkers', 'groceries', 'out'), R('pnp', 'groceries', 'out'),
   R('pick n pay', 'groceries', 'out'), R('shoprite', 'groceries', 'out'), R('shopritehyper', 'groceries', 'out'), R('woolworths', 'groceries', 'out'),
   R('ok express', 'groceries', 'out'), R('usave', 'groceries', 'out'), R('boxer', 'groceries', 'out'), R('food lover', 'groceries', 'out'),
-  R('meat maker', 'groceries', 'out'), R('butchery', 'groceries', 'out'), R('pehomeindustri', 'groceries', 'out'), R('p e home industries', 'groceries', 'out'),
-  R('kfc', 'eating', 'out'), R('wimpy', 'eating', 'out'), R('nando', 'eating', 'out'), R('mcd', 'eating', 'out'),
-  R('steers', 'eating', 'out'), R('debonairs', 'eating', 'out'), R('giggs take', 'eating', 'out'), R('takeaway', 'eating', 'out'),
-  R('fabulous fish', 'eating', 'out'), R('s2s*topfisheri', 'eating', 'out'), R('thecakelady', 'eating', 'out'), R('uber', 'transport', 'out'),
+  R('butchery', 'groceries', 'out'),   R('kfc', 'eating', 'out'), R('wimpy', 'eating', 'out'), R('nando', 'eating', 'out'), R('mcd', 'eating', 'out'),
+  R('steers', 'eating', 'out'), R('debonairs', 'eating', 'out'), R('takeaway', 'eating', 'out'),
+  R('uber', 'transport', 'out'),
   R('dl*uber', 'transport', 'out'), R('bolt', 'transport', 'out'), R('dl*bolt', 'transport', 'out'), R('taxi', 'transport', 'out'),
   R('engen', 'fuel', 'out'), R('shell', 'fuel', 'out'), R('sasol', 'fuel', 'out'), R('caltex', 'fuel', 'out'),
   R('astron', 'fuel', 'out'), R('vodacom', 'airtime', 'out'), R('mtn', 'airtime', 'out'), R('telkom', 'airtime', 'out'),
@@ -56,12 +54,9 @@ export const DEF_RULES: Rule[] = [
   R('apple.com', 'subs', 'out'), R('google', 'subs', 'out'), R('godaddy', 'subs', 'out'), R('cursor', 'subs', 'out'),
   R('netflix', 'subs', 'out'), R('spotify', 'subs', 'out'), R('showmax', 'subs', 'out'), R('dstv', 'subs', 'out'),
   R('openai', 'subs', 'out'), R('anthropic', 'subs', 'out'), R('claude', 'subs', 'out'), R('github', 'subs', 'out'),
-  R('aws', 'subs', 'out'), R('atm cash', 'cash', 'out'), R('cash sent', 'cash', 'out'), R('de aar branch', 'cash', 'out'),
-  R('absa de aar', 'cash', 'out'), R('atm', 'cash', 'out'), R('clicks', 'health', 'out'), R('dischem', 'health', 'out'),
-  R('dis-chem', 'health', 'out'), R('pharmacy', 'health', 'out'), R('novelshoestore', 'shopping', 'out'), R('slops and clog', 'shopping', 'out'),
-  R('mr price', 'shopping', 'out'), R('ackermans', 'shopping', 'out'), R('takealot', 'shopping', 'out'), R('pep', 'shopping', 'out'),
-  R('thewavelounge', 'fun', 'out'), R('cannavida', 'fun', 'out'), R('ccn*studio', 'fun', 'out'),
-];
+  R('aws', 'subs', 'out'), R('atm cash', 'cash', 'out'), R('cash sent', 'cash', 'out'),   R('atm', 'cash', 'out'), R('clicks', 'health', 'out'), R('dischem', 'health', 'out'),
+  R('dis-chem', 'health', 'out'), R('pharmacy', 'health', 'out'),   R('mr price', 'shopping', 'out'), R('ackermans', 'shopping', 'out'), R('takealot', 'shopping', 'out'), R('pep', 'shopping', 'out'),
+  ];
 
 /** The bank's own category (Capitec, some CSVs) mapped to ours, by direction. */
 export const BANKCAT: BankCatMap = {

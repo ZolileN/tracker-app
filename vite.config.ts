@@ -1,8 +1,15 @@
+import { readFileSync } from 'node:fs';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+// `npm run preview` serves the same security headers as Vercel, so the production setup can be tried locally
+const vercel = JSON.parse(readFileSync(new URL('./vercel.json', import.meta.url), 'utf8')) as { headers: { source: string; headers: { key: string; value: string }[] }[] };
+const siteHeaders = Object.fromEntries((vercel.headers.find(h => h.source === '/(.*)')?.headers ?? []).map(h => [h.key, h.value]));
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [
     react(),
     VitePWA({
@@ -31,5 +38,6 @@ export default defineConfig({
     }),
   ],
   server: { host: true },
+  preview: { headers: siteHeaders },
   test: { include: ['tests/**/*.test.ts'] },
 });

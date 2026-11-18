@@ -2,7 +2,7 @@ import type { Line, TextItem } from './types';
 
 /** The small part of the pdf.js API that is used here, so the same code runs in the browser and in Node. */
 export interface PdfJsLike {
-  getDocument(src: { data: Uint8Array; useSystemFonts?: boolean; isEvalSupported?: boolean }): {
+  getDocument(src: { data: Uint8Array; password?: string; useSystemFonts?: boolean; isEvalSupported?: boolean }): {
     promise: Promise<{
       numPages: number;
       getPage(n: number): Promise<{ getTextContent(): Promise<{ items: unknown[] }> }>;
@@ -19,9 +19,10 @@ interface PdfTextItem {
 const isTextItem = (it: unknown): it is PdfTextItem =>
   typeof it === 'object' && it !== null && typeof (it as PdfTextItem).str === 'string' && Array.isArray((it as PdfTextItem).transform);
 
-/** Text of every page, grouped into visual lines (top to bottom) of items (left to right). */
-export async function pdfToLines(pdfjs: PdfJsLike, data: Uint8Array): Promise<Line[]> {
-  const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false }).promise;
+/** Text of every page, grouped into visual lines (top to bottom) of items (left to right).
+    Throws pdf.js's PasswordException (code 1 = password needed, 2 = wrong password) for a locked PDF. */
+export async function pdfToLines(pdfjs: PdfJsLike, data: Uint8Array, password?: string): Promise<Line[]> {
+  const doc = await pdfjs.getDocument({ data, password, useSystemFonts: true, isEvalSupported: false }).promise;
   const lines: Line[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
