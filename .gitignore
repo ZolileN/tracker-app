@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dev-dist/
+*.log
+.DS_Store
+# bank statements and backups never belong in the repo
+*.pdf
+*.ofx
+*.qfx
+*.qif
+budget-backup-*.json
+transactions-*.csv
